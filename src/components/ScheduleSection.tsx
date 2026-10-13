@@ -271,29 +271,32 @@ export const ScheduleSection: React.FC<ScheduleSectionProps> = ({
                         </div>
 
                         {/* Time slots layout */}
-                        <div className="space-y-2 bg-slate-50 rounded-xl p-3.5 border border-slate-100 text-xs sm:text-sm text-slate-700">
+                        <div className="space-y-2.5 bg-slate-50/90 rounded-2xl p-4 border border-slate-100 text-xs sm:text-sm text-slate-700">
                           {item.morningSlot && (
-                            <div className="flex items-start gap-2">
-                              <span className="font-bold text-amber-700 shrink-0 w-16">
-                                <i className="fa-regular fa-sun mr-1"></i>Sáng:
+                            <div className="flex items-start gap-2.5">
+                              <span className="font-bold text-amber-700 shrink-0 w-20 sm:w-22 whitespace-nowrap inline-flex items-center gap-1.5">
+                                <i className="fa-regular fa-sun text-amber-500 w-4 text-center shrink-0"></i>
+                                <span>Sáng:</span>
                               </span>
-                              <span className="font-medium text-slate-800">{item.morningSlot}</span>
+                              <span className="font-medium text-slate-800 flex-1 min-w-0">{item.morningSlot}</span>
                             </div>
                           )}
                           {item.afternoonSlot && (
-                            <div className="flex items-start gap-2">
-                              <span className="font-bold text-orange-700 shrink-0 w-16">
-                                <i className="fa-solid fa-cloud-sun mr-1"></i>Chiều:
+                            <div className="flex items-start gap-2.5">
+                              <span className="font-bold text-orange-700 shrink-0 w-20 sm:w-22 whitespace-nowrap inline-flex items-center gap-1.5">
+                                <i className="fa-solid fa-cloud-sun text-orange-500 w-4 text-center shrink-0"></i>
+                                <span>Chiều:</span>
                               </span>
-                              <span className="font-medium text-slate-800">{item.afternoonSlot}</span>
+                              <span className="font-medium text-slate-800 flex-1 min-w-0">{item.afternoonSlot}</span>
                             </div>
                           )}
                           {item.eveningSlot && (
-                            <div className="flex items-start gap-2">
-                              <span className="font-bold text-indigo-800 shrink-0 w-16">
-                                <i className="fa-solid fa-moon mr-1"></i>Tối:
+                            <div className="flex items-start gap-2.5">
+                              <span className="font-bold text-indigo-800 shrink-0 w-20 sm:w-22 whitespace-nowrap inline-flex items-center gap-1.5">
+                                <i className="fa-solid fa-moon text-indigo-500 w-4 text-center shrink-0"></i>
+                                <span>Tối:</span>
                               </span>
-                              <span className="font-medium text-slate-800">{item.eveningSlot}</span>
+                              <span className="font-medium text-slate-800 flex-1 min-w-0">{item.eveningSlot}</span>
                             </div>
                           )}
                           {item.weeklySchedule && (
