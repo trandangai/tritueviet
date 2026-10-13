@@ -1,0 +1,8 @@
+{
+  "name": "Trung Tâm Dạy Thêm – Bán Trú Trí Tuệ",
+  "description": "Cổng thông tin & Hệ thống quản lý Trung Tâm Dạy Thêm – Nuôi Học Sinh Bán Trú Trí Tuệ tại Quận 12 & Hóc Môn. Tra cứu thời khóa biểu, giáo viên, bán trú và học phí.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
