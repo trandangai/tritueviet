@@ -1,7 +1,17 @@
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { CenterData } from '../types';
 import { initialData } from '../data/initialData';
+import firebaseConfig from '../../firebase-applet-config.json';
+
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+export const db = firebaseConfig.firestoreDatabaseId
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 
 const STORAGE_KEY = 'TRITUE_CENTER_DATA_V1';
+const FIRESTORE_COLLECTION = 'center_config';
+const FIRESTORE_DOC_PATH = 'main';
 
 export const loadCenterData = (): CenterData => {
   try {
@@ -38,6 +48,61 @@ export const saveCenterData = (data: CenterData): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (err) {
     console.error('Failed to save center data to localStorage:', err);
+  }
+
+  // Also persist to Cloud Firestore for multi-device sync
+  try {
+    const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC_PATH);
+    setDoc(docRef, data, { merge: true }).catch((err) => {
+      console.warn('Firestore background sync warning:', err);
+    });
+  } catch (err) {
+    console.warn('Firestore sync failed:', err);
+  }
+};
+
+/**
+ * Subscribes to realtime updates from Cloud Firestore
+ */
+export const subscribeToCenterData = (onUpdate: (data: CenterData) => void) => {
+  try {
+    const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC_PATH);
+    return onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const cloudData = docSnap.data() as Partial<CenterData>;
+          const merged: CenterData = {
+            ...initialData,
+            ...cloudData,
+            campuses: cloudData.campuses || initialData.campuses,
+            schedules: cloudData.schedules || initialData.schedules,
+            teachers: cloudData.teachers || initialData.teachers,
+            boardingTimeline: cloudData.boardingTimeline || initialData.boardingTimeline,
+            boardingRules: cloudData.boardingRules || initialData.boardingRules,
+            fees: cloudData.fees || initialData.fees,
+            leads: cloudData.leads || initialData.leads,
+            adminEmails:
+              Array.isArray(cloudData.adminEmails) && cloudData.adminEmails.length > 0
+                ? cloudData.adminEmails
+                : initialData.adminEmails
+          };
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          } catch (e) {}
+          onUpdate(merged);
+        } else {
+          // Initialize doc with initialData on first read
+          setDoc(docRef, initialData).catch(() => {});
+        }
+      },
+      (err) => {
+        console.warn('Firestore subscription notice (using localStorage fallback):', err);
+      }
+    );
+  } catch (err) {
+    console.warn('Could not initialize Firestore realtime listener:', err);
+    return () => {};
   }
 };
 

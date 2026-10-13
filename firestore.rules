@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Center public data (schedules, teachers, campuses, boarding, fees)
+    match /center_config/{document} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Consultation leads from parents
+    match /leads/{leadId} {
+      allow read, write: if true;
+    }
+  }
+}

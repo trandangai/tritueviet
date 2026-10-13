@@ -32,23 +32,25 @@ export const createGoogleProvider = () => {
 
 const provider = createGoogleProvider();
 
+const TOKEN_KEY = 'TRITUE_G_ACCESS_TOKEN';
+
 let isSigningIn = false;
-let cachedAccessToken: string | null = null;
+let cachedAccessToken: string | null =
+  typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(TOKEN_KEY) : null;
 
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User, token: string | null) => void,
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        // Token might need re-prompt or user is already known in Firebase session
-        if (onAuthFailure) onAuthFailure();
-      }
+      const token = await getAccessToken();
+      if (onAuthSuccess) onAuthSuccess(user, token);
     } else {
       cachedAccessToken = null;
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.removeItem(TOKEN_KEY);
+      }
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -71,6 +73,9 @@ export const googleSignIn = async (forceConsent = true): Promise<{ user: User; a
     }
 
     cachedAccessToken = credential.accessToken;
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(TOKEN_KEY, credential.accessToken);
+    }
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
     if (
@@ -89,10 +94,21 @@ export const googleSignIn = async (forceConsent = true): Promise<{ user: User; a
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  if (cachedAccessToken) return cachedAccessToken;
+  if (typeof sessionStorage !== 'undefined') {
+    const saved = sessionStorage.getItem(TOKEN_KEY);
+    if (saved) {
+      cachedAccessToken = saved;
+      return saved;
+    }
+  }
+  return null;
 };
 
 export const logout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.removeItem(TOKEN_KEY);
+  }
 };

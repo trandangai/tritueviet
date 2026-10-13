@@ -9,7 +9,7 @@ import { AdminModal } from './components/AdminModal';
 import { FloatingActions } from './components/FloatingActions';
 import { Footer } from './components/Footer';
 import { CenterData, ConsultationLead } from './types';
-import { loadCenterData, saveCenterData } from './services/storage';
+import { loadCenterData, saveCenterData, subscribeToCenterData } from './services/storage';
 import { initAuth, googleSignIn, logout } from './services/auth';
 
 export default function App() {
@@ -33,6 +33,11 @@ export default function App() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
+    // Realtime Cloud Firestore sync
+    const unsubData = subscribeToCenterData((cloudData) => {
+      setCenterData(cloudData);
+    });
+
     const unsubscribe = initAuth(
       (user) => {
         setCurrentUser(user);
@@ -57,6 +62,7 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      unsubData();
       unsubscribe();
       window.removeEventListener('keydown', handleKeyDown);
     };
