@@ -42,13 +42,36 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 }) => {
   // Authentication state for Admin
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState('');
+  const [newAdminEmailInput, setNewAdminEmailInput] = useState('');
+  const [newAdminError, setNewAdminError] = useState('');
 
   // Active Admin Tab
   const [activeTab, setActiveTab] = useState<
-    'schedules' | 'teachers' | 'boarding' | 'fees_campuses' | 'leads' | 'workspace'
+    'schedules' | 'teachers' | 'boarding' | 'fees_campuses' | 'leads' | 'workspace' | 'admin_users'
   >('leads');
+
+  // Whitelist of authorized Google admin emails
+  const adminEmails: string[] =
+    Array.isArray(data.adminEmails) && data.adminEmails.length > 0
+      ? data.adminEmails
+      : ['us.documentb@gmail.com'];
+
+  const isUserAuthorizedAdmin = (email?: string | null): boolean => {
+    if (!email) return false;
+    const clean = email.trim().toLowerCase();
+    return adminEmails.some((e) => e.trim().toLowerCase() === clean);
+  };
+
+  // Automatically authenticate if current user is an authorized admin
+  React.useEffect(() => {
+    if (currentUser?.email) {
+      if (isUserAuthorizedAdmin(currentUser.email)) {
+        setIsAuthenticated(true);
+        setAuthError('');
+      }
+    }
+  }, [currentUser, data.adminEmails]);
 
   // Confirmation Modal state
   const [confirmState, setConfirmState] = useState<{
@@ -86,15 +109,68 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle password login
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordInput === data.adminPasswordHash || passwordInput === 'admin') {
-      setIsAuthenticated(true);
-      setAuthError('');
-    } else {
-      setAuthError('Mật khẩu quản trị không chính xác (Mặc định: admin)');
+  // Handle Google Admin login button click
+  const handleGoogleAdminLogin = async () => {
+    setAuthError('');
+    try {
+      await onGoogleSignIn();
+    } catch (err: any) {
+      setAuthError('Lỗi kết nối Google: ' + (err?.message || 'Vui lòng thử lại sau.'));
     }
+  };
+
+  // Add new Google admin email
+  const handleAddAdminEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    setNewAdminError('');
+    const emailToAdd = newAdminEmailInput.trim().toLowerCase();
+    if (!emailToAdd) {
+      setNewAdminError('Vui lòng nhập địa chỉ email Google.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailToAdd)) {
+      setNewAdminError('Địa chỉ email không đúng định dạng.');
+      return;
+    }
+    if (adminEmails.map((e) => e.toLowerCase()).includes(emailToAdd)) {
+      setNewAdminError('Email này đã có trong danh sách quản trị viên.');
+      return;
+    }
+
+    const updated = [...adminEmails, emailToAdd];
+    onUpdateData({ ...data, adminEmails: updated });
+    setNewAdminEmailInput('');
+    setSyncStatus({
+      type: 'success',
+      message: `Đã cấp quyền quản trị thành công cho tài khoản: ${emailToAdd}`
+    });
+  };
+
+  // Delete Google admin email
+  const handleDeleteAdminEmail = (emailToDelete: string) => {
+    if (adminEmails.length <= 1) {
+      alert('Hệ thống phải có ít nhất 1 tài khoản quản trị viên.');
+      return;
+    }
+    setConfirmState({
+      isOpen: true,
+      title: 'Thu hồi quyền quản trị?',
+      message: `Tài khoản ${emailToDelete} sẽ không thể đăng nhập vào trang quản trị này nữa. Bạn có chắc chắn muốn xóa?`,
+      confirmText: 'Thu hồi quyền',
+      isDestructive: true,
+      action: () => {
+        const updated = adminEmails.filter(
+          (e) => e.trim().toLowerCase() !== emailToDelete.trim().toLowerCase()
+        );
+        onUpdateData({ ...data, adminEmails: updated });
+        setConfirmState((prev) => ({ ...prev, isOpen: false }));
+        setSyncStatus({
+          type: 'info',
+          message: `Đã thu hồi quyền quản trị của ${emailToDelete}.`
+        });
+      }
+    });
   };
 
   // Google Workspace actions
@@ -462,36 +538,120 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
         {/* Content Area */}
         {!isAuthenticated ? (
-          /* Password Screen */
+          /* Google Authentication Screen */
           <div className="flex-1 flex items-center justify-center p-6">
             <div className="bg-slate-800/90 border border-slate-700 p-8 rounded-3xl max-w-md w-full shadow-2xl text-center">
-              <div className="w-16 h-16 bg-amber-400/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-4">
-                <i className="fa-solid fa-lock"></i>
+              <div className="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-4 shadow-lg shadow-amber-500/20">
+                <i className="fa-solid fa-user-shield text-2xl"></i>
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Đăng Nhập Quản Trị</h3>
-              <p className="text-xs text-slate-400 mb-6">
-                Vui lòng nhập mật khẩu quản lý trung tâm để truy cập CMS.
-                <br />
-                <span className="text-amber-300 font-semibold">(Mật khẩu mặc định: admin)</span>
+              <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+                Hệ thống yêu cầu xác thực bằng <strong>Tài Khoản Google</strong> có trong danh sách phân quyền của trung tâm.
               </p>
 
-              <form onSubmit={handleLogin} className="space-y-4">
-                <input
-                  type="password"
-                  placeholder="Nhập mật khẩu..."
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  autoFocus
-                />
-                {authError && <p className="text-xs text-rose-400 font-medium">{authError}</p>}
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-3 px-4 rounded-xl text-sm transition shadow-lg shadow-amber-500/20 cursor-pointer"
-                >
-                  Xác nhận truy cập
-                </button>
-              </form>
+              {/* Case 1: currentUser is already signed in with Google */}
+              {currentUser ? (
+                <div className="mb-6 space-y-4">
+                  {isUserAuthorizedAdmin(currentUser.email) ? (
+                    <div className="bg-emerald-950/60 border border-emerald-800 rounded-2xl p-4 text-left">
+                      <div className="flex items-center gap-3 mb-3">
+                        {currentUser.photoURL ? (
+                          <img
+                            src={currentUser.photoURL}
+                            alt="avatar"
+                            className="w-10 h-10 rounded-full border border-emerald-400"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold">
+                            {currentUser.email?.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-white truncate">
+                            {currentUser.displayName || 'Quản Trị Viên'}
+                          </p>
+                          <p className="text-[11px] text-emerald-300 truncate">{currentUser.email}</p>
+                        </div>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                          Hợp Lệ
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsAuthenticated(true)}
+                        className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 px-4 rounded-xl text-xs transition cursor-pointer shadow-md"
+                      >
+                        <i className="fa-solid fa-arrow-right-to-bracket mr-1.5"></i>
+                        Vào Bảng Quản Trị Ngay
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-rose-950/60 border border-rose-800 rounded-2xl p-4 text-left space-y-3">
+                      <div className="flex items-start gap-2.5 text-xs text-rose-300">
+                        <i className="fa-solid fa-circle-xmark text-rose-400 mt-0.5 shrink-0"></i>
+                        <div>
+                          <strong className="text-white block mb-0.5">Truy Cập Bị Từ Chối</strong>
+                          Tài khoản <strong>{currentUser.email}</strong> chưa được cấp quyền quản trị.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleGoogleAdminLogin}
+                        className="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-2.5 px-4 rounded-xl text-xs transition cursor-pointer shadow"
+                      >
+                        <i className="fa-brands fa-google text-red-500 mr-1.5"></i>
+                        Đổi Sang Tài Khoản Google Khác
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Case 2: currentUser not signed in yet */
+                <div className="mb-6">
+                  <button
+                    type="button"
+                    onClick={handleGoogleAdminLogin}
+                    className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-bold py-3.5 px-4 rounded-2xl text-xs sm:text-sm transition shadow-lg cursor-pointer border border-slate-200"
+                  >
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.9c2.28-2.1 3.64-5.2 3.64-9.15z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.9-3.05c-1.08.72-2.45 1.16-4.03 1.16-3.1 0-5.74-2.1-6.68-4.93H1.26v3.15C3.26 21.36 7.36 24 12 24z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.32 14.27c-.24-.73-.38-1.5-.38-2.27s.14-1.54.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.06-3.15z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.18 15.24 0 12 0 7.36 0 3.26 2.64 1.26 6.58l4.06 3.15c.94-2.83 3.58-4.96 6.68-4.96z"
+                      />
+                    </svg>
+                    <span>Đăng Nhập Quản Trị Bằng Google</span>
+                  </button>
+                  <p className="text-[11px] text-slate-400 mt-2 italic">
+                    Chỉ tài khoản Google được cấp quyền mới có thể truy cập
+                  </p>
+                </div>
+              )}
+
+              {authError && (
+                <div className="mb-4 p-2.5 rounded-xl bg-rose-950/60 border border-rose-800 text-xs text-rose-300">
+                  {authError}
+                </div>
+              )}
+
+              {/* Security Policy Notice */}
+              <div className="pt-4 border-t border-slate-700/60 text-center">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700 text-[11px] text-slate-400">
+                  <i className="fa-solid fa-shield-halved text-amber-400"></i>
+                  <span>Bảo mật tối đa: Chỉ chấp nhận xác thực qua Google OAuth</span>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
@@ -624,6 +784,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 >
                   <i className="fa-brands fa-google text-amber-400"></i>
                   <span>Google Workspace</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('admin_users')}
+                  className={`px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-2 ${
+                    activeTab === 'admin_users'
+                      ? 'bg-amber-400 text-slate-950 font-extrabold shadow-sm'
+                      : 'text-amber-300 hover:text-white hover:bg-slate-700'
+                  }`}
+                >
+                  <i className="fa-solid fa-user-shield"></i>
+                  <span>Phân Quyền Admin ({adminEmails.length})</span>
                 </button>
               </div>
 
@@ -1284,6 +1457,141 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           <span>Tạo Google Form Tuyển Sinh</span>
                         </button>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 7: ADMIN USERS (TÀI KHOẢN QUẢN TRỊ GOOGLE) */}
+              {activeTab === 'admin_users' && (
+                <div className="space-y-6">
+                  {/* Overview Banner */}
+                  <div className="bg-gradient-to-r from-slate-900 via-blue-950/70 to-slate-900 p-6 rounded-3xl border border-blue-800/80 shadow-xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center text-2xl shadow-md">
+                          <i className="fa-solid fa-users-gear"></i>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-black text-white">
+                            Quản Lý Tài Khoản Quản Trị Google
+                          </h3>
+                          <p className="text-xs text-slate-300">
+                            Chỉ những tài khoản Gmail có trong danh sách này mới có quyền đăng nhập và chỉnh sửa dữ liệu trung tâm
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-blue-900/40 border border-blue-700/60 px-4 py-2 rounded-2xl text-xs flex items-center gap-2">
+                        <span className="text-slate-300">Tổng số Admin:</span>
+                        <span className="font-extrabold text-amber-300 text-sm">{adminEmails.length}</span>
+                      </div>
+                    </div>
+
+                    {/* Add new Admin Form */}
+                    <form onSubmit={handleAddAdminEmail} className="bg-slate-900/90 p-4 rounded-2xl border border-slate-700 space-y-3">
+                      <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                        <i className="fa-solid fa-user-plus"></i>
+                        <span>Thêm Tài Khoản Quản Trị Viên Mới</span>
+                      </h4>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-1">
+                          <i className="fa-brands fa-google absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                          <input
+                            type="email"
+                            placeholder="Nhập địa chỉ Gmail (VD: giaovien.quanly@gmail.com)..."
+                            value={newAdminEmailInput}
+                            onChange={(e) => setNewAdminEmailInput(e.target.value)}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold rounded-xl text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-2 shrink-0"
+                        >
+                          <i className="fa-solid fa-plus"></i>
+                          <span>Cấp Quyền Quản Trị</span>
+                        </button>
+                      </div>
+                      {newAdminError && (
+                        <p className="text-xs text-rose-400 font-medium flex items-center gap-1.5">
+                          <i className="fa-solid fa-circle-exclamation"></i>
+                          <span>{newAdminError}</span>
+                        </p>
+                      )}
+                      <p className="text-[11px] text-slate-400">
+                        * Tài khoản sau khi thêm có thể vào trang quản trị ngay bằng nút "Đăng Nhập Quản Trị Bằng Google".
+                      </p>
+                    </form>
+                  </div>
+
+                  {/* List of Admins */}
+                  <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 space-y-4">
+                    <h4 className="text-sm font-bold text-white flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <i className="fa-solid fa-shield-halved text-amber-400"></i>
+                        Danh Sách Quản Trị Viên Được Cấp Phép ({adminEmails.length})
+                      </span>
+                    </h4>
+
+                    <div className="space-y-3">
+                      {adminEmails.map((email, index) => {
+                        const isCurrent = currentUser?.email?.toLowerCase() === email.toLowerCase();
+                        const isPrimary = index === 0;
+                        return (
+                          <div
+                            key={email}
+                            className={`p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                              isCurrent
+                                ? 'bg-blue-950/70 border-blue-700'
+                                : 'bg-slate-900/80 border-slate-700/80 hover:border-slate-600'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-sm shadow">
+                                {email.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold text-white">{email}</span>
+                                  {isPrimary && (
+                                    <span className="text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full font-bold">
+                                      Super Admin
+                                    </span>
+                                  )}
+                                  {isCurrent && (
+                                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold">
+                                      Bạn đang dùng
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  {isPrimary
+                                    ? 'Tài khoản quản trị viên chính của trung tâm'
+                                    : 'Quản trị viên được phân quyền đầy đủ'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                              {adminEmails.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAdminEmail(email)}
+                                  className="px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                                  title="Thu hồi quyền quản trị"
+                                >
+                                  <i className="fa-solid fa-trash-can text-xs"></i>
+                                  <span>Xóa Quyền</span>
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-slate-500 italic">
+                                  (Quản trị viên duy nhất)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

@@ -528,6 +528,7 @@ export const initialData: CenterData = {
     }
   ],
   adminPasswordHash: 'admin',
+  adminEmails: ['us.documentb@gmail.com'],
   googleSheetsId: '',
   googleFormsUrl: ''
 };

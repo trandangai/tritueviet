@@ -21,7 +21,11 @@ export const loadCenterData = (): CenterData => {
       boardingTimeline: parsed.boardingTimeline || initialData.boardingTimeline,
       boardingRules: parsed.boardingRules || initialData.boardingRules,
       fees: parsed.fees || initialData.fees,
-      leads: parsed.leads || initialData.leads
+      leads: parsed.leads || initialData.leads,
+      adminEmails:
+        Array.isArray(parsed.adminEmails) && parsed.adminEmails.length > 0
+          ? parsed.adminEmails
+          : initialData.adminEmails
     };
   } catch (err) {
     console.error('Failed to parse center data from localStorage, using initial:', err);

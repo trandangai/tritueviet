@@ -92,6 +92,7 @@ export interface CenterData {
   fees: FeeItem[];
   leads: ConsultationLead[];
   adminPasswordHash: string; // Simple hash or string for admin access
+  adminEmails: string[]; // Whitelist of authorized Google emails for admin access
   googleSheetsId?: string;
   googleFormsUrl?: string;
 }
